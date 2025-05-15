@@ -14,7 +14,7 @@ from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
 
 # ——— Configuration ———
-BASE_URL_TEMPLATE = "https://ge.movie/filter-movies?search=&type=movie&languages=ka&imdb=6;10.0&year=2023;2027&page={}"
+BASE_URL_TEMPLATE = "https://ge.movie/filter-movies?search=&type=movie&languages=ka&imdb=6;10.0&year=2025;2027&page={}"
 HOSTNAME = "ge.movie"
 USER_AGENTS = [
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15',

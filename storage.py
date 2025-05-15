@@ -137,3 +137,12 @@ def mark_downloaded(detail_id: int, file_path: str) -> None:
     """, (file_path, detail_id))
     conn.commit()
     conn.close()
+
+def clear_movie_links() -> None:
+    """
+    Delete all rows from movie_links (so next run starts fresh).
+    """
+    conn = _get_conn()
+    conn.execute("DELETE FROM movie_links;")
+    conn.commit()
+    conn.close()
