@@ -22,7 +22,7 @@ USER_AGENTS = [
 MAX_PAGES = 50
 PAGE_DELAY = 10  # seconds between pages
 
-def _resolve_ip(hostname: str) -> Optional[str]:
+def _resolve_ip_sync(hostname: str) -> Optional[str]:
     """Resolve hostname to IPv4 via Cloudflare DNS."""
     try:
         resolver = dns.resolver.Resolver()
@@ -53,7 +53,7 @@ def step1_collect_links(max_pages: int = MAX_PAGES, delay: int = PAGE_DELAY) -> 
     """
     Crawl the paginated movie list and return all individual movie-page URLs.
     """
-    target_ip = _resolve_ip(HOSTNAME)
+    target_ip = _resolve_ip_sync(HOSTNAME)
     driver = _init_driver(HOSTNAME, target_ip)
     wait = WebDriverWait(driver, 15)
     
