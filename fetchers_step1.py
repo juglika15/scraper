@@ -1,5 +1,3 @@
-# fetchers.py
-
 import time
 import random
 from typing import List, Optional

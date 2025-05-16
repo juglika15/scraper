@@ -1,53 +1,85 @@
-# storage.py
-
 import sqlite3
 import json
-from typing import List, Dict, Any
+from typing import List, Dict, Mapping, Any
 from config import DB_PATH
 from models import MovieDetails
 
-def _get_conn() -> sqlite3.Connection:
+def _get_conn():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 def init_db() -> None:
-    """
-    Create the two tables:
-      - movie_links(url, processed)
-      - movie_details(id, url, title, …, api_url, downloaded_path)
-    """
     conn = _get_conn()
     c = conn.cursor()
     c.execute("""
-        CREATE TABLE IF NOT EXISTS movie_links (
-            url TEXT PRIMARY KEY,
-            processed INTEGER NOT NULL DEFAULT 0
-        );
-    """)
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS movie_details (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            url TEXT UNIQUE,
-            title TEXT,
-            poster_url TEXT,
-            genre TEXT,
-            studio TEXT,
-            year INTEGER,
-            directors TEXT,
-            length TEXT,
-            countries TEXT,
-            budget TEXT,
-            box_office TEXT,
-            plot TEXT,
-            actors TEXT,
-            api_url TEXT,
-            downloaded_path TEXT DEFAULT NULL,
-            FOREIGN KEY(url) REFERENCES movie_links(url)
-        );
+      CREATE TABLE IF NOT EXISTS movie_details (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        url            TEXT UNIQUE,
+        imdb_id        TEXT,
+        title_ge       TEXT,
+        title_en       TEXT,
+        poster_link    TEXT,
+        genre          TEXT,
+        studio         TEXT,
+        year           INTEGER,
+        directors      TEXT,
+        length         TEXT,
+        countries      TEXT,
+        budget         TEXT,
+        box_office     TEXT,
+        plot           TEXT,
+        actors         TEXT,
+        api_url        TEXT,
+        downloaded_path TEXT
+      );
     """)
     conn.commit()
     conn.close()
+
+def save_details(details: Mapping[str, Any]) -> None:
+    """
+    details is a dict with keys:
+      url, imdb_id, title ({"ge":…, "en":…}), poster_link,
+      movie_info dict (keys like "Genre","Studio",…),
+      actors dict, api_url (optional)
+    """
+    # pull fields out, with safe defaults
+    url         = details["url"]
+    imdb_id     = details.get("imdb_id", "")
+    poster_link = details.get("poster_link", "")
+    title_ge    = details.get("title", {}).get("ge", "")
+    title_en    = details.get("title", {}).get("en", "")
+    mi          = details.get("movie_info", {})
+    genre       = mi.get("Genre", "")
+    studio      = mi.get("Studio", "")
+    year        = int(mi.get("Year", 0)) if mi.get("Year") else None
+    directors   = mi.get("Director", "")
+    length      = mi.get("Length", "")
+    countries   = mi.get("Country", "")
+    budget      = mi.get("Budget", "")
+    box_office  = mi.get("Box office", "")
+    plot        = mi.get("ფილმის სიუჟეტი", "")  # whatever key you used
+    actors      = details.get("actors", {})
+    api_url     = details.get("api_movie_link", details.get("movie_api_url", ""))
+
+    conn = _get_conn()
+    c = conn.cursor()
+    c.execute("""
+      INSERT OR REPLACE INTO movie_details
+      (url, imdb_id, title_ge, title_en, poster_link,
+       genre, studio, year, directors, length,
+       countries, budget, box_office, plot, actors, api_url)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    """, (
+      url, imdb_id, title_ge, title_en, poster_link,
+      genre, studio, year, directors, length,
+      countries, budget, box_office, plot,
+      json.dumps(actors), api_url
+    ))
+    conn.commit()
+    conn.close()
+
 
 def save_links(links: List[str]) -> None:
     """
@@ -144,5 +176,23 @@ def clear_movie_links() -> None:
     """
     conn = _get_conn()
     conn.execute("DELETE FROM movie_links;")
+    conn.commit()
+    conn.close()
+
+def clear_movie_details() -> None:
+    """
+    Delete all rows from movie_details.
+    """
+    conn = _get_conn()
+    conn.execute("DELETE FROM movie_details;")
+    conn.commit()
+    conn.close()
+    
+def reset_links_processed() -> None:
+    """
+    Mark every movie_links.processed = 0 so step2 can re-run on all of them.
+    """
+    conn = _get_conn()
+    conn.execute("UPDATE movie_links SET processed = 0;")
     conn.commit()
     conn.close()
