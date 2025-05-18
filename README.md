@@ -6,6 +6,10 @@ python main.py 1
 
 python main.py 2
 
+# step 3
+
+python main.py 3
+
 # all steps
 
 python main.py all
