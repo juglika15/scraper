@@ -3,6 +3,7 @@ import dns.resolver
 from typing import Optional
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright, TimeoutError
+import time
 
 from storage import clear_movie_details, reset_links_processed, init_db, fetch_unprocessed_links, save_details
 from config import HOSTNAME, USER_AGENTS
@@ -13,6 +14,16 @@ async def _resolve_ip_async(hostname: str = HOSTNAME) -> Optional[str]:
     loop = asyncio.get_running_loop()
     answers = await loop.run_in_executor(None, resolver.resolve, hostname, "A")
     return answers[0].address if answers else None
+
+def safe_split(text, delimiter=": ", default_key=None):
+    if delimiter in text:
+        return text.split(delimiter, 1)
+    if default_key:
+        return (default_key, text.strip())
+    return (None, None)
+
+def safe_get_text(el):
+    return el.text.strip() if el else ""
 
 async def _fetch_one(movie_link: str) -> dict | None:
     init_db()
@@ -68,24 +79,35 @@ async def _fetch_one(movie_link: str) -> dict | None:
         divs = h1.find_all("div") if h1 else []
         title_ge = divs[0].text.strip().split(" (2")[0] if len(divs) > 0 else ""
         title_en = divs[1].text.strip().split("\t")[0] if len(divs) > 1 else ""
+        print(f"  → {title_en}")
 
         # Movie info
         movie_info = {}
-        for p in soup.select("section.content div.textOf p"):
-            txt = p.text.strip()
-            key, val = (txt.split(": ", 1) if ": " in txt else (None, None))
+        info_block = soup.find("div", class_="textOf")
+        paras = info_block.find_all("p") if info_block else []
+        for i, p in enumerate(paras):
+            key, val = safe_split(
+                p.text.strip(),
+                ": ",
+                "ფილმის სიუჟეტი" if i == len(paras) - 1 else None
+            )
             if key:
-                movie_info[key.strip()] = val.strip()
+                movie_info[key] = val
 
         # Actors list
         actors = []
-        names = soup.find_all("p", class_="actor-name")
-        imgs  = soup.select("div.actor-img img[src]")
-        for name_el, img_el in zip(names, imgs):
-            img_url = img_el["src"]
-            if img_url.startswith("/"):
-                img_url = f"https://{HOSTNAME}{img_url}"
-            actors.append({"name": name_el.text.strip(), "img": img_url})
+        for item in soup.select("div.actor-item"):
+            name_el = item.select_one("p.actor-name")
+            img_el  = item.select_one("div.actor-img img")
+
+            name = name_el.get_text(strip=True) if name_el else ""
+            # prefer data-src (lazy-loaded), fallback to src
+            img  = img_el.get("data-src") or img_el.get("src") or ""
+
+            actors.append({
+                "name": name,
+                "img": img
+            })
 
         # Trigger player to intercept
         try:
